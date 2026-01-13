@@ -6,5 +6,6 @@ public record PullRequestInfo(
     string Title,
     bool IsDraft,
     bool IsClean,
-    string BaseBranch
+    string BaseBranch,
+    bool AutoMergeEnabled
 );

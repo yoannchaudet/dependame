@@ -67,13 +67,23 @@ public class AutoMergeService(GitHub github, DependameContext context)
             // MergeableState of "clean" means PR is ready to merge
             var isClean = detailedPr.MergeableState?.Value == Octokit.MergeableState.Clean;
 
+            // Check auto-merge status via GraphQL (not available in Octokit REST model)
+            var autoMergeQuery = new Query()
+                .Repository(Repo, Owner)
+                .PullRequest(pr.Number)
+                .Select(p => p.AutoMergeRequest.Select(amr => amr.EnabledAt).SingleOrDefault());
+
+            var autoMergeEnabledAt = await github.ExecuteAsync(async () =>
+                await github.GraphQLClient.Run(autoMergeQuery));
+
             results.Add(new PullRequestInfo(
                 detailedPr.NodeId,
                 detailedPr.Number,
                 detailedPr.Title,
                 detailedPr.Draft,
                 isClean,
-                detailedPr.Base.Ref
+                detailedPr.Base.Ref,
+                autoMergeEnabledAt != null
             ));
         }
 
@@ -93,6 +103,12 @@ public class AutoMergeService(GitHub github, DependameContext context)
         if (pr.IsClean)
         {
             Console.WriteLine($"  Skipping: PR is already in clean state");
+            return;
+        }
+
+        if (pr.AutoMergeEnabled)
+        {
+            Console.WriteLine($"  Skipping: auto-merge already enabled");
             return;
         }
 
@@ -129,13 +145,6 @@ public class AutoMergeService(GitHub github, DependameContext context)
         }
         catch (Exception ex)
         {
-            // Check if auto-merge is already enabled
-            if (ex.Message.Contains("already enabled") || ex.Message.Contains("Pull request is in clean status"))
-            {
-                Console.WriteLine($"  Skipping: auto-merge already enabled or PR is ready to merge");
-                return;
-            }
-
             Console.WriteLine($"  Failed to enable auto-merge for PR #{pr.Number}: {ex.Message}");
 
             if (ex.Message.Contains("Resource not accessible"))
