@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="ActionsMinUtils" Version="0.0.0-alpha.27" />
+    <PackageReference Include="Octokit.GraphQL" Version="0.3.0-beta" />
   </ItemGroup>
 
 </Project>

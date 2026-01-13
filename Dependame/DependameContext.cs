@@ -1,4 +1,5 @@
 using ActionsMinUtils;
+using Octokit.GraphQL.Model;
 
 namespace Dependame;
 
@@ -14,4 +15,21 @@ public class DependameContext : ActionContext
 
     public string RepositoryOwner => GitHubRepository.Split('/')[0];
     public string RepositoryName => GitHubRepository.Split('/').Length > 1 ? GitHubRepository.Split('/')[1] : "";
+
+    // Auto-merge configuration
+    public string? AutoMergeBranches => GetInput("auto_merge_branches");
+
+    public IReadOnlyList<string> AutoMergeBranchPatterns =>
+        string.IsNullOrWhiteSpace(AutoMergeBranches)
+            ? Array.Empty<string>()
+            : AutoMergeBranches.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    public string AutoMergeMethod => GetInput("auto_merge_method") ?? "squash";
+
+    public PullRequestMergeMethod ParsedMergeMethod => AutoMergeMethod.ToLowerInvariant() switch
+    {
+        "merge" => PullRequestMergeMethod.Merge,
+        "rebase" => PullRequestMergeMethod.Rebase,
+        _ => PullRequestMergeMethod.Squash
+    };
 }

@@ -11,6 +11,19 @@ inputs:
     description: 'Command to execute: DoSomething or NoOp'
     required: true
     default: 'DoSomething'
+  auto_merge_branches:
+    description: |
+      Target branches for auto-merge. Supports:
+      - Single branch: "main"
+      - Multiple branches: "main,develop"
+      - Glob patterns: "release/*"
+      Leave empty to disable auto-merge feature.
+    required: false
+    default: ''
+  auto_merge_method:
+    description: 'Merge method for auto-merge: merge, squash, or rebase'
+    required: false
+    default: 'squash'
 
 runs:
   using: 'docker'
@@ -18,3 +31,5 @@ runs:
   args:
     - ${{ inputs.github_token }}
     - ${{ inputs.command }}
+    - ${{ inputs.auto_merge_branches }}
+    - ${{ inputs.auto_merge_method }}
