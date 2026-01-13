@@ -7,35 +7,21 @@ using PullRequestMergeMethod = Octokit.GraphQL.Model.PullRequestMergeMethod;
 
 namespace Dependame.AutoMerge;
 
-public class AutoMergeService
+public class AutoMergeService(GitHub github, DependameContext context)
 {
-    private readonly GitHub _github;
-    private readonly string _owner;
-    private readonly string _repo;
-    private readonly BranchMatcher _branchMatcher;
-    private readonly PullRequestMergeMethod _mergeMethod;
+    private readonly BranchMatcher _branchMatcher = new(context.AutoMergeBranchPatterns);
 
-    public AutoMergeService(
-        GitHub github,
-        string owner,
-        string repo,
-        IReadOnlyList<string> branchPatterns,
-        PullRequestMergeMethod mergeMethod)
-    {
-        _github = github;
-        _owner = owner;
-        _repo = repo;
-        _branchMatcher = new BranchMatcher(branchPatterns);
-        _mergeMethod = mergeMethod;
-    }
+    private string Owner => context.RepositoryOwner;
+    private string Repo => context.RepositoryName;
+    private PullRequestMergeMethod MergeMethod => context.ParsedMergeMethod;
 
     public async Task ProcessAllPullRequestsAsync()
     {
-        Console.WriteLine($"Processing pull requests for {_owner}/{_repo}");
+        Console.WriteLine($"Processing pull requests for {Owner}/{Repo}");
 
         // Check if auto-merge is enabled for the repository
-        var repo = await _github.ExecuteAsync(async () =>
-            await _github.RestClient.Repository.Get(_owner, _repo));
+        var repo = await github.ExecuteAsync(async () =>
+            await github.RestClient.Repository.Get(Owner, Repo));
 
         if (repo.AllowAutoMerge != true)
         {
@@ -69,14 +55,14 @@ public class AutoMergeService
             PageSize = 100
         };
 
-        var pullRequests = await _github.ExecuteAsync(async () =>
-            await _github.RestClient.PullRequest.GetAllForRepository(_owner, _repo, request, options));
+        var pullRequests = await github.ExecuteAsync(async () =>
+            await github.RestClient.PullRequest.GetAllForRepository(Owner, Repo, request, options));
 
         foreach (var pr in pullRequests)
         {
             // Fetch individual PR to get mergeable status
-            var detailedPr = await _github.ExecuteAsync(async () =>
-                await _github.RestClient.PullRequest.Get(_owner, _repo, pr.Number));
+            var detailedPr = await github.ExecuteAsync(async () =>
+                await github.RestClient.PullRequest.Get(Owner, Repo, pr.Number));
 
             // MergeableState of "clean" means PR is ready to merge
             var isClean = detailedPr.MergeableState?.Value == Octokit.MergeableState.Clean;
@@ -129,15 +115,15 @@ public class AutoMergeService
                 .EnablePullRequestAutoMerge(new EnablePullRequestAutoMergeInput
                 {
                     PullRequestId = new ID(pr.NodeId),
-                    MergeMethod = _mergeMethod
+                    MergeMethod = MergeMethod
                 })
                 .Select(payload => new
                 {
                     PullRequestId = payload.PullRequest!.Id
                 });
 
-            await _github.ExecuteAsync(async () =>
-                await _github.GraphQLClient.Run(mutation));
+            await github.ExecuteAsync(async () =>
+                await github.GraphQLClient.Run(mutation));
 
             Console.WriteLine($"  Successfully enabled auto-merge for PR #{pr.Number}");
         }

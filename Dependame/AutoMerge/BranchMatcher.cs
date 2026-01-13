@@ -6,21 +6,14 @@ namespace Dependame.AutoMerge;
 /// Matches branch names against configured patterns.
 /// Supports exact names, comma-separated lists, and glob patterns (e.g., "release/*").
 /// </summary>
-public class BranchMatcher
+public class BranchMatcher(IReadOnlyList<string> patterns)
 {
-    private readonly IReadOnlyList<string> _patterns;
-
-    public BranchMatcher(IReadOnlyList<string> patterns)
-    {
-        _patterns = patterns;
-    }
-
     public bool IsMatch(string branchName)
     {
-        if (_patterns.Count == 0)
+        if (patterns.Count == 0)
             return false;
 
-        foreach (var pattern in _patterns)
+        foreach (var pattern in patterns)
         {
             if (IsPatternMatch(pattern, branchName))
                 return true;

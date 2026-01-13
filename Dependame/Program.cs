@@ -13,13 +13,7 @@ switch (context.Command)
         // Enable auto-merge if configured
         if (context.AutoMergeBranchPatterns.Count > 0)
         {
-            var autoMergeService = new AutoMergeService(
-                github,
-                context.RepositoryOwner,
-                context.RepositoryName,
-                context.AutoMergeBranchPatterns,
-                context.ParsedMergeMethod);
-
+            var autoMergeService = new AutoMergeService(github, context);
             await autoMergeService.ProcessAllPullRequestsAsync();
         }
         break;
