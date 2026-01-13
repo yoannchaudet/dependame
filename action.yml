@@ -1,0 +1,20 @@
+name: 'dependame'
+description: 'A GitHub Action built with .NET'
+author: '@yoannchaudet'
+
+inputs:
+  github_token:
+    description: 'GitHub token for API access'
+    required: true
+    default: ${{ github.token }}
+  command:
+    description: 'Command to execute: DoSomething or NoOp'
+    required: true
+    default: 'DoSomething'
+
+runs:
+  using: 'docker'
+  image: 'Dependame/Dockerfile'
+  args:
+    - ${{ inputs.github_token }}
+    - ${{ inputs.command }}

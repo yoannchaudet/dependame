@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Dependame.Tests/Dependame.Tests.csproj" />
+  <Project Path="Dependame/Dependame.csproj" />
+</Solution>
