@@ -32,4 +32,5 @@ public class DependameContext : ActionContext
         "rebase" => PullRequestMergeMethod.Rebase,
         _ => PullRequestMergeMethod.Squash
     };
+
 }

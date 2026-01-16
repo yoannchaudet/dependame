@@ -24,7 +24,6 @@ inputs:
     description: 'Merge method for auto-merge: merge, squash, or rebase'
     required: false
     default: 'squash'
-
 runs:
   using: 'docker'
   image: 'Dependame/Dockerfile'
