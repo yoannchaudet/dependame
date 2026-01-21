@@ -40,12 +40,6 @@ switch (context.Command)
             var github = new GitHub(context.GitHubToken);
             Console.WriteLine($"Running BumpPR in {context.GitHubRepository}");
 
-            if (context.BumpPRActorList.Count == 0)
-            {
-                Console.WriteLine("No bump_pr_actors configured, skipping.");
-                break;
-            }
-
             var bumpPRService = new BumpPRService(github, context);
             await bumpPRService.ProcessAllPullRequestsAsync();
         }

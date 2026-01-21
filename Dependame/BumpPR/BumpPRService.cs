@@ -19,7 +19,6 @@ public class BumpPRService(GitHub github, DependameContext context)
         var currentUserLogin = currentUser.Login;
 
         Console.WriteLine($"Authenticated user: {currentUserLogin}");
-        Console.WriteLine($"Target actors: {string.Join(", ", context.BumpPRActorList)}");
 
         var pullRequests = await GetOpenPullRequestsAsync();
 

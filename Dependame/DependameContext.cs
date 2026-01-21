@@ -32,12 +32,4 @@ public class DependameContext : ActionContext
         "rebase" => PullRequestMergeMethod.Rebase,
         _ => PullRequestMergeMethod.Squash
     };
-
-    // BumpPR configuration
-    public string? BumpPRActors => GetInput("bump_pr_actors");
-
-    public IReadOnlyList<string> BumpPRActorList =>
-        string.IsNullOrWhiteSpace(BumpPRActors)
-            ? Array.Empty<string>()
-            : BumpPRActors.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }
