@@ -5,7 +5,7 @@ namespace Dependame;
 
 public class DependameContext : ActionContext
 {
-    public enum CommandType { EnableAutoMerge, UpdateBranch, NoOp }
+    public enum CommandType { EnableAutoMerge, UpdateBranch, BumpPR, NoOp }
 
     public string GitHubToken => GetInput("github_token", required: true)!;
 
@@ -33,4 +33,11 @@ public class DependameContext : ActionContext
         _ => PullRequestMergeMethod.Squash
     };
 
+    // BumpPR configuration
+    public string? BumpPRActors => GetInput("bump_pr_actors");
+
+    public IReadOnlyList<string> BumpPRActorList =>
+        string.IsNullOrWhiteSpace(BumpPRActors)
+            ? Array.Empty<string>()
+            : BumpPRActors.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }

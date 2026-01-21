@@ -8,7 +8,7 @@ inputs:
     required: true
     default: ${{ github.token }}
   command:
-    description: 'Command to execute: EnableAutoMerge, UpdateBranch, or NoOp'
+    description: 'Command to execute: EnableAutoMerge, UpdateBranch, BumpPR, or NoOp'
     required: true
   auto_merge_branches:
     description: |
@@ -23,6 +23,12 @@ inputs:
     description: 'Merge method for auto-merge: merge, squash, or rebase'
     required: false
     default: 'squash'
+  bump_pr_actors:
+    description: |
+      Comma-separated list of actor usernames whose PRs should receive a blank commit.
+      Example: "dependabot[bot],renovate[bot]"
+    required: false
+    default: ''
 runs:
   using: 'docker'
   image: 'Dependame/Dockerfile'
@@ -31,3 +37,4 @@ runs:
     - ${{ inputs.command }}
     - ${{ inputs.auto_merge_branches }}
     - ${{ inputs.auto_merge_method }}
+    - ${{ inputs.bump_pr_actors }}

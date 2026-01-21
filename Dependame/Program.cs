@@ -1,6 +1,7 @@
 using ActionsMinUtils.github;
 using Dependame;
 using Dependame.AutoMerge;
+using Dependame.BumpPR;
 using Dependame.UpdateBranch;
 
 var context = new DependameContext();
@@ -31,6 +32,22 @@ switch (context.Command)
 
             var updateBranchService = new UpdateBranchService(github, context);
             await updateBranchService.ProcessAllPullRequestsAsync();
+        }
+        break;
+
+    case DependameContext.CommandType.BumpPR:
+        {
+            var github = new GitHub(context.GitHubToken);
+            Console.WriteLine($"Running BumpPR in {context.GitHubRepository}");
+
+            if (context.BumpPRActorList.Count == 0)
+            {
+                Console.WriteLine("No bump_pr_actors configured, skipping.");
+                break;
+            }
+
+            var bumpPRService = new BumpPRService(github, context);
+            await bumpPRService.ProcessAllPullRequestsAsync();
         }
         break;
 
