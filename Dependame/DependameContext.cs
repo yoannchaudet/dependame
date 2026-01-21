@@ -5,7 +5,7 @@ namespace Dependame;
 
 public class DependameContext : ActionContext
 {
-    public enum CommandType { DoSomething, NoOp }
+    public enum CommandType { EnableAutoMerge, UpdateBranch, NoOp }
 
     public string GitHubToken => GetInput("github_token", required: true)!;
 

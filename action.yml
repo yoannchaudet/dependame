@@ -8,9 +8,8 @@ inputs:
     required: true
     default: ${{ github.token }}
   command:
-    description: 'Command to execute: DoSomething or NoOp'
+    description: 'Command to execute: EnableAutoMerge, UpdateBranch, or NoOp'
     required: true
-    default: 'DoSomething'
   auto_merge_branches:
     description: |
       Target branches for auto-merge. Supports:

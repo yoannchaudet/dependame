@@ -7,20 +7,31 @@ var context = new DependameContext();
 
 switch (context.Command)
 {
-    case DependameContext.CommandType.DoSomething:
-        var github = new GitHub(context.GitHubToken);
-        Console.WriteLine($"Running in {context.GitHubRepository}");
-
-        // Enable auto-merge if configured
-        if (context.AutoMergeBranchPatterns.Count > 0)
+    case DependameContext.CommandType.EnableAutoMerge:
         {
-            var autoMergeService = new AutoMergeService(github, context);
-            await autoMergeService.ProcessAllPullRequestsAsync();
-        }
+            var github = new GitHub(context.GitHubToken);
+            Console.WriteLine($"Running EnableAutoMerge in {context.GitHubRepository}");
 
-        // Update PR branches that are behind their base branch
-        var updateBranchService = new UpdateBranchService(github, context);
-        await updateBranchService.ProcessAllPullRequestsAsync();
+            if (context.AutoMergeBranchPatterns.Count > 0)
+            {
+                var autoMergeService = new AutoMergeService(github, context);
+                await autoMergeService.ProcessAllPullRequestsAsync();
+            }
+            else
+            {
+                Console.WriteLine("No auto-merge branch patterns configured, skipping.");
+            }
+        }
+        break;
+
+    case DependameContext.CommandType.UpdateBranch:
+        {
+            var github = new GitHub(context.GitHubToken);
+            Console.WriteLine($"Running UpdateBranch in {context.GitHubRepository}");
+
+            var updateBranchService = new UpdateBranchService(github, context);
+            await updateBranchService.ProcessAllPullRequestsAsync();
+        }
         break;
 
     case DependameContext.CommandType.NoOp:
