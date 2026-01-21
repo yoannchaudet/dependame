@@ -1,6 +1,6 @@
 using ActionsMinUtils.github;
 using Dependame.AutoMerge.Models;
-using Octokit;
+using Dependame.Shared;
 using Octokit.GraphQL;
 using Octokit.GraphQL.Model;
 using PullRequestMergeMethod = Octokit.GraphQL.Model.PullRequestMergeMethod;
@@ -10,6 +10,7 @@ namespace Dependame.AutoMerge;
 public class AutoMergeService(GitHub github, DependameContext context)
 {
     private readonly BranchMatcher _branchMatcher = new(context.AutoMergeBranchPatterns);
+    private readonly PullRequestProvider _prProvider = new(github, context.RepositoryOwner, context.RepositoryName);
 
     private string Owner => context.RepositoryOwner;
     private string Repo => context.RepositoryName;
@@ -30,7 +31,7 @@ public class AutoMergeService(GitHub github, DependameContext context)
             return;
         }
 
-        var pullRequests = await GetOpenPullRequestsAsync();
+        var pullRequests = await GetEnrichedPullRequestsAsync();
 
         Console.WriteLine($"Found {pullRequests.Count} open pull requests");
 
@@ -40,25 +41,12 @@ public class AutoMergeService(GitHub github, DependameContext context)
         }
     }
 
-    private async Task<IReadOnlyList<PullRequestInfo>> GetOpenPullRequestsAsync()
+    private async Task<IReadOnlyList<PullRequestInfo>> GetEnrichedPullRequestsAsync()
     {
         var results = new List<PullRequestInfo>();
+        var openPRs = await _prProvider.GetOpenPullRequestsAsync();
 
-        // Use REST API to list all open PRs with pagination
-        var request = new PullRequestRequest
-        {
-            State = ItemStateFilter.Open
-        };
-
-        var options = new ApiOptions
-        {
-            PageSize = 100
-        };
-
-        var pullRequests = await github.ExecuteAsync(async () =>
-            await github.RestClient.PullRequest.GetAllForRepository(Owner, Repo, request, options));
-
-        foreach (var pr in pullRequests)
+        foreach (var pr in openPRs)
         {
             // Fetch individual PR to get mergeable status
             var detailedPr = await github.ExecuteAsync(async () =>
@@ -77,12 +65,15 @@ public class AutoMergeService(GitHub github, DependameContext context)
                 await github.GraphQLClient.Run(autoMergeQuery));
 
             results.Add(new PullRequestInfo(
-                detailedPr.NodeId,
-                detailedPr.Number,
-                detailedPr.Title,
-                detailedPr.Draft,
+                pr.NodeId,
+                pr.Number,
+                pr.Title,
+                pr.IsDraft,
+                pr.Author,
+                pr.BaseBranch,
+                pr.HeadRef,
+                pr.HeadSha,
                 isClean,
-                detailedPr.Base.Ref,
                 autoMergeEnabledAt != null
             ));
         }

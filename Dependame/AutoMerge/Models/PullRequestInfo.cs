@@ -1,3 +1,5 @@
+using Dependame.Shared.Models;
+
 namespace Dependame.AutoMerge.Models;
 
 public record PullRequestInfo(
@@ -5,7 +7,10 @@ public record PullRequestInfo(
     int Number,
     string Title,
     bool IsDraft,
-    bool IsClean,
+    string Author,
     string BaseBranch,
+    string HeadRef,
+    string HeadSha,
+    bool IsClean,
     bool AutoMergeEnabled
-);
+) : OpenPullRequest(NodeId, Number, Title, IsDraft, Author, BaseBranch, HeadRef, HeadSha);

@@ -1,3 +1,5 @@
+using Dependame.Shared.Models;
+
 namespace Dependame.UpdateBranch.Models;
 
 public record UpdateBranchPrInfo(
@@ -5,6 +7,9 @@ public record UpdateBranchPrInfo(
     int Number,
     string Title,
     bool IsDraft,
-    bool IsBehind,
-    string BaseBranch
-);
+    string Author,
+    string BaseBranch,
+    string HeadRef,
+    string HeadSha,
+    bool IsBehind
+) : OpenPullRequest(NodeId, Number, Title, IsDraft, Author, BaseBranch, HeadRef, HeadSha);

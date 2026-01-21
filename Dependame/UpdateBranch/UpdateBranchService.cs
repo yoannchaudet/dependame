@@ -1,6 +1,6 @@
 using ActionsMinUtils.github;
+using Dependame.Shared;
 using Dependame.UpdateBranch.Models;
-using Octokit;
 using Octokit.GraphQL;
 using Octokit.GraphQL.Model;
 
@@ -8,6 +8,8 @@ namespace Dependame.UpdateBranch;
 
 public class UpdateBranchService(GitHub github, DependameContext context)
 {
+    private readonly PullRequestProvider _prProvider = new(github, context.RepositoryOwner, context.RepositoryName);
+
     private string Owner => context.RepositoryOwner;
     private string Repo => context.RepositoryName;
 
@@ -15,7 +17,7 @@ public class UpdateBranchService(GitHub github, DependameContext context)
     {
         Console.WriteLine($"Processing pull requests for branch updates in {Owner}/{Repo}");
 
-        var pullRequests = await GetOpenPullRequestsAsync();
+        var pullRequests = await GetEnrichedPullRequestsAsync();
 
         Console.WriteLine($"Found {pullRequests.Count} open pull requests");
 
@@ -23,24 +25,12 @@ public class UpdateBranchService(GitHub github, DependameContext context)
         await GroupAndProcessByBaseBranchAsync(pullRequests);
     }
 
-    private async Task<IReadOnlyList<UpdateBranchPrInfo>> GetOpenPullRequestsAsync()
+    private async Task<IReadOnlyList<UpdateBranchPrInfo>> GetEnrichedPullRequestsAsync()
     {
         var results = new List<UpdateBranchPrInfo>();
+        var openPRs = await _prProvider.GetOpenPullRequestsAsync();
 
-        var request = new PullRequestRequest
-        {
-            State = ItemStateFilter.Open
-        };
-
-        var options = new ApiOptions
-        {
-            PageSize = 100
-        };
-
-        var pullRequests = await github.ExecuteAsync(async () =>
-            await github.RestClient.PullRequest.GetAllForRepository(Owner, Repo, request, options));
-
-        foreach (var pr in pullRequests)
+        foreach (var pr in openPRs)
         {
             // Fetch individual PR to get mergeable status
             var detailedPr = await github.ExecuteAsync(async () =>
@@ -50,12 +40,15 @@ public class UpdateBranchService(GitHub github, DependameContext context)
             var isBehind = detailedPr.MergeableState?.Value == Octokit.MergeableState.Behind;
 
             results.Add(new UpdateBranchPrInfo(
-                detailedPr.NodeId,
-                detailedPr.Number,
-                detailedPr.Title,
-                detailedPr.Draft,
-                isBehind,
-                detailedPr.Base.Ref
+                pr.NodeId,
+                pr.Number,
+                pr.Title,
+                pr.IsDraft,
+                pr.Author,
+                pr.BaseBranch,
+                pr.HeadRef,
+                pr.HeadSha,
+                isBehind
             ));
         }
 

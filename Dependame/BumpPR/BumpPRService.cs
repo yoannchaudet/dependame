@@ -1,11 +1,14 @@
 using ActionsMinUtils.github;
 using Dependame.BumpPR.Models;
+using Dependame.Shared;
 using Octokit;
 
 namespace Dependame.BumpPR;
 
 public class BumpPRService(GitHub github, DependameContext context)
 {
+    private readonly PullRequestProvider _prProvider = new(github, context.RepositoryOwner, context.RepositoryName);
+
     private string Owner => context.RepositoryOwner;
     private string Repo => context.RepositoryName;
 
@@ -20,7 +23,7 @@ public class BumpPRService(GitHub github, DependameContext context)
 
         Console.WriteLine($"Authenticated user: {currentUserLogin}");
 
-        var pullRequests = await GetOpenPullRequestsAsync();
+        var pullRequests = await GetEnrichedPullRequestsAsync();
 
         Console.WriteLine($"Found {pullRequests.Count} open pull requests");
 
@@ -30,24 +33,12 @@ public class BumpPRService(GitHub github, DependameContext context)
         }
     }
 
-    private async Task<IReadOnlyList<BumpPRInfo>> GetOpenPullRequestsAsync()
+    private async Task<IReadOnlyList<BumpPRInfo>> GetEnrichedPullRequestsAsync()
     {
         var results = new List<BumpPRInfo>();
+        var openPRs = await _prProvider.GetOpenPullRequestsAsync();
 
-        var request = new PullRequestRequest
-        {
-            State = ItemStateFilter.Open
-        };
-
-        var options = new ApiOptions
-        {
-            PageSize = 100
-        };
-
-        var pullRequests = await github.ExecuteAsync(async () =>
-            await github.RestClient.PullRequest.GetAllForRepository(Owner, Repo, request, options));
-
-        foreach (var pr in pullRequests)
+        foreach (var pr in openPRs)
         {
             // Get commits for the PR to find the last commit author
             var commits = await github.ExecuteAsync(async () =>
@@ -60,9 +51,11 @@ public class BumpPRService(GitHub github, DependameContext context)
                 pr.NodeId,
                 pr.Number,
                 pr.Title,
-                pr.User.Login,
-                pr.Head.Ref,
-                pr.Head.Sha,
+                pr.IsDraft,
+                pr.Author,
+                pr.BaseBranch,
+                pr.HeadRef,
+                pr.HeadSha,
                 lastCommitAuthor
             ));
         }
