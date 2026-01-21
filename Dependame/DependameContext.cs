@@ -32,4 +32,7 @@ public class DependameContext : ActionContext
         "rebase" => PullRequestMergeMethod.Rebase,
         _ => PullRequestMergeMethod.Squash
     };
+
+    // UpdateBranch configuration
+    public string? UpdateBranchLabel => GetInput("update_branch_label");
 }

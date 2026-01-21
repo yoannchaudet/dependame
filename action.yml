@@ -23,6 +23,13 @@ inputs:
     description: 'Merge method for auto-merge: merge, squash, or rebase'
     required: false
     default: 'squash'
+  update_branch_label:
+    description: |
+      Label to apply to PRs after their branch is updated.
+      The label is removed from PRs that are behind their base branch.
+      Set to empty string to disable labeling.
+    required: false
+    default: 'ready-for-review'
 runs:
   using: 'docker'
   image: 'Dependame/Dockerfile'
@@ -31,3 +38,4 @@ runs:
     - ${{ inputs.command }}
     - ${{ inputs.auto_merge_branches }}
     - ${{ inputs.auto_merge_method }}
+    - ${{ inputs.update_branch_label }}

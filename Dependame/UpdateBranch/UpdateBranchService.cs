@@ -1,6 +1,7 @@
 using ActionsMinUtils.github;
 using Dependame.Shared;
 using Dependame.UpdateBranch.Models;
+using Octokit;
 using Octokit.GraphQL;
 using Octokit.GraphQL.Model;
 
@@ -21,8 +22,15 @@ public class UpdateBranchService(GitHub github, DependameContext context)
 
         Console.WriteLine($"Found {pullRequests.Count} open pull requests");
 
+        // Remove label from all PRs that are behind
+        var behindPRs = pullRequests.Where(pr => !pr.IsDraft && pr.IsBehind).ToList();
+        foreach (var pr in behindPRs)
+        {
+            await RemoveLabelIfPresentAsync(pr);
+        }
+
         // Group PRs by base branch and process
-        await GroupAndProcessByBaseBranchAsync(pullRequests);
+        await GroupAndProcessByBaseBranchAsync(behindPRs);
     }
 
     private async Task<IReadOnlyList<UpdateBranchPrInfo>> GetEnrichedPullRequestsAsync()
@@ -57,9 +65,8 @@ public class UpdateBranchService(GitHub github, DependameContext context)
 
     private async Task GroupAndProcessByBaseBranchAsync(IReadOnlyList<UpdateBranchPrInfo> pullRequests)
     {
-        // Filter and group PRs by base branch
+        // Group PRs by base branch
         var prsByBaseBranch = pullRequests
-            .Where(pr => !pr.IsDraft && pr.IsBehind)
             .GroupBy(pr => pr.BaseBranch)
             .ToList();
 
@@ -78,7 +85,12 @@ public class UpdateBranchService(GitHub github, DependameContext context)
 
             Console.WriteLine($"  Updating PR #{prToUpdate.Number}: {prToUpdate.Title}");
 
-            await UpdatePullRequestBranchAsync(prToUpdate);
+            var updated = await UpdatePullRequestBranchAsync(prToUpdate);
+
+            if (updated)
+            {
+                await AddLabelAsync(prToUpdate);
+            }
 
             // Log skipped PRs
             foreach (var skippedPr in group.Skip(1))
@@ -88,7 +100,7 @@ public class UpdateBranchService(GitHub github, DependameContext context)
         }
     }
 
-    private async Task UpdatePullRequestBranchAsync(UpdateBranchPrInfo pr)
+    private async Task<bool> UpdatePullRequestBranchAsync(UpdateBranchPrInfo pr)
     {
         try
         {
@@ -106,6 +118,7 @@ public class UpdateBranchService(GitHub github, DependameContext context)
                 await github.GraphQLClient.Run(mutation));
 
             Console.WriteLine($"  Successfully updated branch for PR #{pr.Number}");
+            return true;
         }
         catch (Exception ex)
         {
@@ -119,6 +132,49 @@ public class UpdateBranchService(GitHub github, DependameContext context)
             {
                 Console.WriteLine("    Hint: Check that the token has 'contents: write' permission");
             }
+
+            return false;
+        }
+    }
+
+    private async Task AddLabelAsync(UpdateBranchPrInfo pr)
+    {
+        if (string.IsNullOrWhiteSpace(context.UpdateBranchLabel)) return;
+
+        try
+        {
+            await github.ExecuteAsync(async () =>
+                await github.RestClient.Issue.Labels.AddToIssue(
+                    Owner, Repo, pr.Number,
+                    new[] { context.UpdateBranchLabel }));
+
+            Console.WriteLine($"  Added label '{context.UpdateBranchLabel}' to PR #{pr.Number}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  Failed to add label to PR #{pr.Number}: {ex.Message}");
+        }
+    }
+
+    private async Task RemoveLabelIfPresentAsync(UpdateBranchPrInfo pr)
+    {
+        if (string.IsNullOrWhiteSpace(context.UpdateBranchLabel)) return;
+
+        try
+        {
+            await github.ExecuteAsync(async () =>
+                await github.RestClient.Issue.Labels.RemoveFromIssue(
+                    Owner, Repo, pr.Number, context.UpdateBranchLabel));
+
+            Console.WriteLine($"  Removed label '{context.UpdateBranchLabel}' from PR #{pr.Number}");
+        }
+        catch (NotFoundException)
+        {
+            // Label not present on this PR, ignore
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  Failed to remove label from PR #{pr.Number}: {ex.Message}");
         }
     }
 }
