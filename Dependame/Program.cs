@@ -3,7 +3,6 @@ using Dependame;
 using Dependame.AutoMerge;
 using Dependame.BumpPR;
 using Dependame.UpdateBranch;
-using Octokit;
 
 var context = new DependameContext();
 
@@ -34,23 +33,11 @@ switch (context.Command)
             // Ensure label exists if configured
             if (!string.IsNullOrWhiteSpace(context.UpdateBranchLabel))
             {
-                try
-                {
-                    await github.ExecuteAsync(async () =>
-                        await github.RestClient.Issue.Labels.Get(
-                            context.RepositoryOwner,
-                            context.RepositoryName,
-                            context.UpdateBranchLabel));
-                }
-                catch (NotFoundException)
-                {
-                    await github.ExecuteAsync(async () =>
-                        await github.RestClient.Issue.Labels.Create(
-                            context.RepositoryOwner,
-                            context.RepositoryName,
-                            new NewLabel(context.UpdateBranchLabel, "0e8a16")));
-                    Console.WriteLine($"Created label '{context.UpdateBranchLabel}'");
-                }
+                await github.CreateOrUpdateIssueLabel(
+                    context.RepositoryOwner,
+                    context.RepositoryName,
+                    context.UpdateBranchLabel,
+                    "0e8a16");
             }
 
             var updateBranchService = new UpdateBranchService(github, context);
