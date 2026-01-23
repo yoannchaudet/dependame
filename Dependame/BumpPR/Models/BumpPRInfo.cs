@@ -11,5 +11,6 @@ public record BumpPRInfo(
     string BaseBranch,
     string HeadRef,
     string HeadSha,
-    string? LastCommitAuthor
+    string? LastCommitAuthor,
+    bool LastCommitIsCoAuthored
 ) : OpenPullRequest(NodeId, Number, Title, IsDraft, Author, BaseBranch, HeadRef, HeadSha);
