@@ -46,7 +46,10 @@ public class BumpPRService(GitHub github, DependameContext context)
 
             var lastCommit = commits.LastOrDefault();
             var lastCommitAuthor = lastCommit?.Author?.Login;
+            var lastCommitCommitter = lastCommit?.Committer?.Login;
             var lastCommitIsCoAuthored = lastCommit?.Commit?.Message?.Contains("Co-authored-by:", StringComparison.OrdinalIgnoreCase) ?? false;
+            var lastCommitIsAutomated = lastCommitAuthor != null && lastCommitCommitter != null &&
+                !string.Equals(lastCommitAuthor, lastCommitCommitter, StringComparison.OrdinalIgnoreCase);
 
             results.Add(new BumpPRInfo(
                 pr.NodeId,
@@ -58,7 +61,8 @@ public class BumpPRService(GitHub github, DependameContext context)
                 pr.HeadRef,
                 pr.HeadSha,
                 lastCommitAuthor,
-                lastCommitIsCoAuthored
+                lastCommitIsCoAuthored,
+                lastCommitIsAutomated
             ));
         }
 
@@ -68,8 +72,9 @@ public class BumpPRService(GitHub github, DependameContext context)
     private async Task ProcessPullRequestAsync(BumpPRInfo pr, string currentUserLogin)
     {
         // Check if last commit was already made by the authenticated user (already bumped)
-        // Exception: if the commit was co-authored, we still bump it (likely an automated commit)
-        if (string.Equals(pr.LastCommitAuthor, currentUserLogin, StringComparison.OrdinalIgnoreCase) && !pr.LastCommitIsCoAuthored)
+        // Exception: if the commit was co-authored or automated (committer != author), we still bump it
+        if (string.Equals(pr.LastCommitAuthor, currentUserLogin, StringComparison.OrdinalIgnoreCase) &&
+            !pr.LastCommitIsCoAuthored && !pr.LastCommitIsAutomated)
         {
             Console.WriteLine($"  Skipping PR #{pr.Number}: already bumped (last commit by '{pr.LastCommitAuthor}')");
             return;

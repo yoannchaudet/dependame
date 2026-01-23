@@ -12,5 +12,6 @@ public record BumpPRInfo(
     string HeadRef,
     string HeadSha,
     string? LastCommitAuthor,
-    bool LastCommitIsCoAuthored
+    bool LastCommitIsCoAuthored,
+    bool LastCommitIsAutomated
 ) : OpenPullRequest(NodeId, Number, Title, IsDraft, Author, BaseBranch, HeadRef, HeadSha);
