@@ -2,6 +2,7 @@ using ActionsMinUtils.github;
 using Dependame;
 using Dependame.AutoMerge;
 using Dependame.BumpPR;
+using Dependame.RetryFailedChecks;
 using Dependame.UpdateBranch;
 
 var context = new DependameContext();
@@ -52,6 +53,16 @@ switch (context.Command)
 
             var bumpPRService = new BumpPRService(github, context);
             await bumpPRService.ProcessAllPullRequestsAsync();
+        }
+        break;
+
+    case DependameContext.CommandType.RetryFailedChecks:
+        {
+            var github = new GitHub(context.GitHubToken);
+            Console.WriteLine($"Running RetryFailedChecks in {context.GitHubRepository}");
+
+            var retryService = new RetryFailedChecksService(github, context);
+            await retryService.ProcessAllPullRequestsAsync();
         }
         break;
 

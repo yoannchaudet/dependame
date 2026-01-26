@@ -12,6 +12,8 @@ This GitHub Action automates a set of recurring pull request maintenance tasks t
 
 3. Pushes a blank commit to open pull requests to trigger downstream GitHub Actions workflows that would not otherwise run (e.g., workflows that don't trigger on Dependabot PRs). The action only bumps PRs when required status checks are in "Expected — Waiting for status to be reported" state and no workflows are currently running. This prevents unnecessary bumps when checks have already been reported or when workflows are still in progress.
 
+4. Automatically retries failed GitHub Actions workflow runs on open pull requests. The action identifies workflows that have failed, timed out, or been cancelled, and reruns only the failed jobs. It skips PRs where workflows are still running to avoid conflicts.
+
 ## Intent
 
 Dependame is designed to make dependency and pull request maintenance predictable, serialized, and explicitly controlled, while still benefiting from automation.
