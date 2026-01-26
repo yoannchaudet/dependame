@@ -8,6 +8,7 @@ namespace Dependame.BumpPR;
 public class BumpPRService(GitHub github, DependameContext context)
 {
     private readonly PullRequestProvider _prProvider = new(github, context.RepositoryOwner, context.RepositoryName);
+    private readonly Dictionary<string, IReadOnlyList<string>> _requiredChecksCache = new();
 
     private string Owner => context.RepositoryOwner;
     private string Repo => context.RepositoryName;
@@ -16,20 +17,13 @@ public class BumpPRService(GitHub github, DependameContext context)
     {
         Console.WriteLine($"Processing pull requests for BumpPR in {Owner}/{Repo}");
 
-        // Get the authenticated user's login to check for already-bumped PRs
-        var currentUser = await github.ExecuteAsync(async () =>
-            await github.RestClient.User.Current());
-        var currentUserLogin = currentUser.Login;
-
-        Console.WriteLine($"Authenticated user: {currentUserLogin}");
-
         var pullRequests = await GetEnrichedPullRequestsAsync();
 
         Console.WriteLine($"Found {pullRequests.Count} open pull requests");
 
         foreach (var pr in pullRequests)
         {
-            await ProcessPullRequestAsync(pr, currentUserLogin);
+            await ProcessPullRequestAsync(pr);
         }
     }
 
@@ -40,16 +34,7 @@ public class BumpPRService(GitHub github, DependameContext context)
 
         foreach (var pr in openPRs)
         {
-            // Get commits for the PR to find the last commit author
-            var commits = await github.ExecuteAsync(async () =>
-                await github.RestClient.PullRequest.Commits(Owner, Repo, pr.Number));
-
-            var lastCommit = commits.LastOrDefault();
-            var lastCommitAuthor = lastCommit?.Author?.Login;
-            var lastCommitCommitter = lastCommit?.Committer?.Login;
-            var lastCommitIsCoAuthored = lastCommit?.Commit?.Message?.Contains("Co-authored-by:", StringComparison.OrdinalIgnoreCase) ?? false;
-            var lastCommitIsAutomated = lastCommitAuthor != null && lastCommitCommitter != null &&
-                !string.Equals(lastCommitAuthor, lastCommitCommitter, StringComparison.OrdinalIgnoreCase);
+            var checkStatus = await GetCheckStatusInfoAsync(pr.BaseBranch, pr.HeadSha);
 
             results.Add(new BumpPRInfo(
                 pr.NodeId,
@@ -60,27 +45,127 @@ public class BumpPRService(GitHub github, DependameContext context)
                 pr.BaseBranch,
                 pr.HeadRef,
                 pr.HeadSha,
-                lastCommitAuthor,
-                lastCommitIsCoAuthored,
-                lastCommitIsAutomated
+                checkStatus
             ));
         }
 
         return results;
     }
 
-    private async Task ProcessPullRequestAsync(BumpPRInfo pr, string currentUserLogin)
+    private async Task<CheckStatusInfo?> GetCheckStatusInfoAsync(string baseBranch, string headSha)
     {
-        // Check if last commit was already made by the authenticated user (already bumped)
-        // Exception: if the commit was co-authored or automated (committer != author), we still bump it
-        if (string.Equals(pr.LastCommitAuthor, currentUserLogin, StringComparison.OrdinalIgnoreCase) &&
-            !pr.LastCommitIsCoAuthored && !pr.LastCommitIsAutomated)
+        try
         {
-            Console.WriteLine($"  Skipping PR #{pr.Number}: already bumped (last commit by '{pr.LastCommitAuthor}')");
+            var requiredContexts = await GetRequiredStatusChecksAsync(baseBranch);
+            var reportedContexts = await GetReportedChecksAsync(headSha);
+            var hasRunningWorkflows = await HasRunningWorkflowsAsync(headSha);
+
+            return new CheckStatusInfo(requiredContexts, reportedContexts, hasRunningWorkflows);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  Warning: Could not get check status info: {ex.Message}");
+            return null;
+        }
+    }
+
+    private async Task<IReadOnlyList<string>> GetRequiredStatusChecksAsync(string branch)
+    {
+        // Check cache first
+        if (_requiredChecksCache.TryGetValue(branch, out var cached))
+        {
+            return cached;
+        }
+
+        try
+        {
+            var requiredChecks = await github.ExecuteAsync(async () =>
+                await github.RestClient.Repository.Branch.GetRequiredStatusChecks(Owner, Repo, branch));
+
+            var contexts = requiredChecks.Contexts.ToList();
+            _requiredChecksCache[branch] = contexts;
+            return contexts;
+        }
+        catch (NotFoundException)
+        {
+            // No branch protection or no required status checks
+            _requiredChecksCache[branch] = [];
+            return [];
+        }
+    }
+
+    private async Task<IReadOnlyList<string>> GetReportedChecksAsync(string sha)
+    {
+        var reportedContexts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Get commit statuses
+        var combinedStatus = await github.ExecuteAsync(async () =>
+            await github.RestClient.Repository.Status.GetCombined(Owner, Repo, sha));
+
+        foreach (var status in combinedStatus.Statuses)
+        {
+            reportedContexts.Add(status.Context);
+        }
+
+        // Get check runs
+        var checkRuns = await github.ExecuteAsync(async () =>
+            await github.RestClient.Check.Run.GetAllForReference(Owner, Repo, sha));
+
+        foreach (var checkRun in checkRuns.CheckRuns)
+        {
+            reportedContexts.Add(checkRun.Name);
+        }
+
+        return reportedContexts.ToList();
+    }
+
+    private async Task<bool> HasRunningWorkflowsAsync(string sha)
+    {
+        var request = new WorkflowRunsRequest
+        {
+            HeadSha = sha,
+            Status = CheckRunStatusFilter.InProgress
+        };
+
+        var runs = await github.ExecuteAsync(async () =>
+            await github.RestClient.Actions.Workflows.Runs.List(Owner, Repo, request));
+
+        return runs.TotalCount > 0;
+    }
+
+    private async Task ProcessPullRequestAsync(BumpPRInfo pr)
+    {
+        // Skip if we couldn't get check status info
+        if (pr.CheckStatus == null)
+        {
+            Console.WriteLine($"  Skipping PR #{pr.Number}: could not determine check status");
             return;
         }
 
+        // Skip if no required status checks on base branch
+        if (pr.CheckStatus.RequiredContexts.Count == 0)
+        {
+            Console.WriteLine($"  Skipping PR #{pr.Number}: no required status checks on '{pr.BaseBranch}'");
+            return;
+        }
+
+        // Skip if workflows are currently running
+        if (pr.CheckStatus.HasRunningWorkflows)
+        {
+            Console.WriteLine($"  Skipping PR #{pr.Number}: workflows are currently running");
+            return;
+        }
+
+        // Skip if all required checks have been reported
+        if (pr.CheckStatus.PendingRequiredContexts.Count == 0)
+        {
+            Console.WriteLine($"  Skipping PR #{pr.Number}: all required checks have been reported");
+            return;
+        }
+
+        // Bump the PR
         Console.WriteLine($"  Bumping PR #{pr.Number}: {pr.Title}");
+        Console.WriteLine($"    Pending required checks: {string.Join(", ", pr.CheckStatus.PendingRequiredContexts)}");
         await PushBlankCommitAsync(pr);
     }
 
