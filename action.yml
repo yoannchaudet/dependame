@@ -7,6 +7,9 @@ inputs:
     description: 'GitHub token for API access'
     required: true
     default: ${{ github.token }}
+  repository:
+    description: 'Repository to operate on (owner/repo format). Defaults to GITHUB_REPOSITORY environment variable.'
+    required: false
   command:
     description: 'Command to execute: EnableAutoMerge, UpdateBranch, BumpPR, or NoOp'
     required: true
@@ -39,3 +42,4 @@ runs:
     - ${{ inputs.auto_merge_branches }}
     - ${{ inputs.auto_merge_method }}
     - ${{ inputs.update_branch_label }}
+    - ${{ inputs.repository }}

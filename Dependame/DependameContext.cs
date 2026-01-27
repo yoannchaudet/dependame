@@ -11,7 +11,12 @@ public class DependameContext : ActionContext
 
     public CommandType Command => Enum.Parse<CommandType>(GetInput("command", required: true)!);
 
-    public string GitHubRepository => GetEnvironmentVariable("GITHUB_REPOSITORY") ?? "";
+    private string? RepositoryInput => GetInput("repository");
+
+    public string GitHubRepository =>
+        string.IsNullOrWhiteSpace(RepositoryInput)
+            ? GetEnvironmentVariable("GITHUB_REPOSITORY", required: true)!
+            : RepositoryInput;
 
     public string RepositoryOwner => GitHubRepository.Split('/')[0];
     public string RepositoryName => GitHubRepository.Split('/').Length > 1 ? GitHubRepository.Split('/')[1] : "";
